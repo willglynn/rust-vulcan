@@ -1,16 +1,16 @@
 use crate::opcodes::Opcode;
 use crate::opcodes::InvalidOpcode;
 use crate::memory::Memory;
-use crate::address::Address;
+use crate::address::Word;
 use crate::memory::PeekPoke;
 use std::convert::TryFrom;
 
 struct CPU {
     memory: Memory, // Main memory, all of it
-    pc: Address, // program counter, address of the low byte of the instruction
-    dp: Address, // data pointer, address of the low byte of one cell above the data stack
-    sp: Address, // stack pointer, address of the low byte of the return stack
-    iv: Address, // interrupt vector
+    pc: Word, // program counter, address of the low byte of the instruction
+    dp: Word, // data pointer, address of the low byte of one cell above the data stack
+    sp: Word, // stack pointer, address of the low byte of the return stack
+    iv: Word, // interrupt vector
     int_enabled: bool, // interrupt enable bit
     halted: bool, // Whether the CPU is halted
 }
@@ -102,7 +102,7 @@ impl CPU {
         }
     }
 
-    fn execute(&mut self, instruction: Instruction) -> Address {
+    fn execute(&mut self, instruction: Instruction) -> Word {
         if let Some(arg) = instruction.arg {
             self.push_data(arg)
         }
@@ -251,7 +251,7 @@ mod tests {
     impl CPU {
         fn get_stack(&self) -> Vec<u32> {
             let mut v = Vec::new();
-            let mut curr = Address::from(256);
+            let mut curr = Word::from(256);
             while curr < self.dp {
                 v.push(self.memory.peek24(curr));
                 curr += 3
@@ -261,7 +261,7 @@ mod tests {
 
         fn get_call(&self) -> Vec<u32> {
             let mut v = Vec::new();
-            let mut curr = Address::from(1024);
+            let mut curr = Word::from(1024);
             while curr > self.sp {
                 curr -= 3;
                 v.push(self.memory.peek24(curr));
@@ -287,7 +287,7 @@ mod tests {
         })
     }
 
-    fn call_stack_opcode_test(given: Vec<u32>, given_r: Vec<u32>, opcode: Opcode, expected: Vec<u32>, expected_r: Vec<u32>, pc: Address) {
+    fn call_stack_opcode_test(given: Vec<u32>, given_r: Vec<u32>, opcode: Opcode, expected: Vec<u32>, expected_r: Vec<u32>, pc: Word) {
         predicate_opcode_test(opcode, |cpu| {
             for i in given.into_iter() { cpu.push_data(i) }
             for i in given_r.into_iter() { cpu.push_call(i) }
@@ -298,7 +298,7 @@ mod tests {
         })
     }
 
-    fn control_flow_opcode_test<A>(given: Vec<u32>, opcode: Opcode, expected_pc: A) where A: Into<Address> {
+    fn control_flow_opcode_test<A>(given: Vec<u32>, opcode: Opcode, expected_pc: A) where A: Into<Word> {
         predicate_opcode_test(opcode, |cpu| {
             for i in given.into_iter() { cpu.push_data(i) }
         }, |cpu| {
@@ -311,13 +311,13 @@ mod tests {
                               |cpu| {
                                   for i in given.into_iter() { cpu.push_data(i) }
                                   for (offset, byte) in given_memory.into_iter().enumerate() {
-                                      cpu.memory.poke(Address::from(2048 + offset as u32), byte)
+                                      cpu.memory.poke(Word::from(2048 + offset as u32), byte)
                                   }
                               },
                               |cpu| {
                                   if let Some(expected_memory) = expected_memory {
                                       for (offset, byte) in expected_memory.into_iter().enumerate() {
-                                          let actual = cpu.memory.peek(Address::from(2048 + offset as u32));
+                                          let actual = cpu.memory.peek(Word::from(2048 + offset as u32));
                                           assert_eq!(byte, actual, "At address 2048 + {}", offset)
                                       }
                                       assert_eq!(cpu.get_stack(), expected)

@@ -1,5 +1,6 @@
-use crate::memory::PeekPoke;
 use crate::address::Word;
+use crate::memory::PeekPoke;
+use std::ops::Range;
 
 pub trait Device {
     fn tick(&mut self);
@@ -7,15 +8,18 @@ pub trait Device {
 }
 
 pub struct Bus<A, B> {
-    start: Word,
-    end: Word,
+    range: Range<Word>,
     device: A,
-    rest: B
+    rest: B,
 }
 
 impl<A, B> Bus<A, B> {
     fn new(start: u32, end: u32, device: A, rest: B) -> Self {
-        Self { start: start.into(), end: end.into(), device, rest }
+        Self {
+            range: start.into()..end.into(),
+            device,
+            rest,
+        }
     }
 
     fn at(addr: u32, device: A, rest: B) -> Self {
@@ -25,16 +29,16 @@ impl<A, B> Bus<A, B> {
 
 impl<A: PeekPoke, B: PeekPoke> PeekPoke for Bus<A, B> {
     fn peek(&self, addr: Word) -> u8 {
-        if addr >= self.start && addr <= self.end {
-            self.device.peek(addr - self.start)
+        if self.range.contains(&addr) {
+            self.device.peek(addr - self.range.start)
         } else {
             self.rest.peek(addr)
         }
     }
 
     fn poke(&mut self, addr: Word, val: u8) {
-        if addr >= self.start && addr <= self.end {
-            self.device.poke(addr - self.start, val)
+        if self.range.contains(&addr) {
+            self.device.poke(addr - self.range.start, val)
         } else {
             self.rest.poke(addr, val)
         }
@@ -59,14 +63,22 @@ mod tests {
 
     struct TestDevice(i32);
     impl Device for TestDevice {
-        fn tick(&mut self) { self.0 += 1 }
-        fn reset(&mut self) { self.0 = 10 }
+        fn tick(&mut self) {
+            self.0 += 1
+        }
+        fn reset(&mut self) {
+            self.0 = 10
+        }
     }
 
     struct ArrayDevice([u8; 10]);
     impl PeekPoke for ArrayDevice {
-        fn peek(&self, addr: Word) -> u8 { self.0[usize::from(addr)] }
-        fn poke(&mut self, addr: Word, val: u8) { self.0[usize::from(addr)] = val }
+        fn peek(&self, addr: Word) -> u8 {
+            self.0[usize::from(addr)]
+        }
+        fn poke(&mut self, addr: Word, val: u8) {
+            self.0[usize::from(addr)] = val
+        }
     }
 
     #[test]
@@ -76,7 +88,9 @@ mod tests {
         let device3 = TestDevice(7);
         let mut bus = Bus::at(5, device1, Bus::at(6, device2, device3));
 
-        for _ in 0..5 { bus.tick() }
+        for _ in 0..5 {
+            bus.tick()
+        }
         assert_eq!(bus.device.0, 10);
         assert_eq!(bus.rest.device.0, 11);
         assert_eq!(bus.rest.rest.0, 12);

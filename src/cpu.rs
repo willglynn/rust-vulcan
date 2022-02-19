@@ -141,8 +141,8 @@ impl CPU {
                     self.push_data(x);
                     self.push_data(y)
                 }
-                Opcode::Store => { self.memory.poke(x, y as u8) }
-                Opcode::Storew => { self.memory.poke24(x, y) }
+                Opcode::Store => { self.memory.poke(x.into(), y as u8) }
+                Opcode::Storew => { self.memory.poke24(x.into(), y) }
                 Opcode::Setsdp => {
                     self.dp = x.into();
                     self.sp = y.into()
@@ -189,11 +189,11 @@ impl CPU {
                 Opcode::Hlt => { self.halted = true }
                 Opcode::Load => {
                     let x = self.pop_data();
-                    self.push_data(self.memory.peek(x) as u32)
+                    self.push_data(self.memory.peek(x.into()) as u32)
                 }
                 Opcode::Loadw => {
                     let x = self.pop_data();
-                    self.push_data(self.memory.peek24(x))
+                    self.push_data(self.memory.peek24(x.into()))
                 }
                 Opcode::Inton => { self.int_enabled = true }
                 Opcode::Intoff => { self.int_enabled = false }
@@ -436,8 +436,8 @@ mod tests {
         let mut cpu = CPU::new(Memory::default());
         cpu.push_data(37u32);
         cpu.push_data(45u32);
-        assert_eq!(cpu.memory.peek24(256), 37);
-        assert_eq!(cpu.memory.peek24(259), 45);
+        assert_eq!(cpu.memory.peek24_u32(256), 37);
+        assert_eq!(cpu.memory.peek24_u32(259), 45);
 
         cpu.push_call(12u32);
         cpu.push_call(34u32);
@@ -458,12 +458,12 @@ mod tests {
     #[test]
     fn test_cpu_fetch() {
         let mut cpu = CPU::new(Memory::default());
-        cpu.memory.poke(0x400, 0x01); // nop 1 arg
-        cpu.memory.poke(0x401, 0x02); // 2
-        cpu.memory.poke(0x402, 0x07); // add 3 arg
-        cpu.memory.poke24(0x403, 0x123456); // 3-byte arg
-        cpu.memory.poke(0x406, 29 << 2); // hlt
-        cpu.memory.poke(0x407, 0xfc); // gibberish
+        cpu.memory.poke_u32(0x400, 0x01); // nop 1 arg
+        cpu.memory.poke_u32(0x401, 0x02); // 2
+        cpu.memory.poke_u32(0x402, 0x07); // add 3 arg
+        cpu.memory.poke24_u32(0x403, 0x123456); // 3-byte arg
+        cpu.memory.poke_u32(0x406, 29 << 2); // hlt
+        cpu.memory.poke_u32(0x407, 0xfc); // gibberish
 
         assert_eq!(cpu.fetch(), Ok(Instruction { opcode: Opcode::Nop, arg: Some(2), length: 2 }));
 

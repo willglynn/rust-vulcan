@@ -39,27 +39,30 @@ impl std::ops::IndexMut<Word> for Memory {
 }
 
 pub trait PeekPoke {
-    fn peek<A: Into<Word>>(&self, addr: A) -> u8;
-    fn poke<A: Into<Word>>(&mut self, addr: A, val: u8);
+    fn peek(&self, addr: Word) -> u8;
+    fn poke(&mut self, addr: Word, val: u8);
 
-    fn peek24<A: Into<Word>>(&self, addr: A) -> u32 {
-        let addr = addr.into();
+    fn peek24(&self, addr: Word) -> u32 {
         (self.peek(addr) as u32)
             | ((self.peek(addr + 1) as u32) << 8)
             | ((self.peek(addr + 2) as u32) << 16)
     }
 
-    fn poke24<A: Into<Word>>(&mut self, addr: A, val: u32) {
-        let addr = addr.into();
+    fn poke24(&mut self, addr: Word, val: u32) {
         self.poke(addr, val as u8);
         self.poke(addr + 1, (val >> 8) as u8);
         self.poke(addr + 2, (val >> 16) as u8);
     }
+
+    fn peek_u32(&self, addr: u32) -> u8 { self.peek(addr.into()) }
+    fn poke_u32(&mut self, addr: u32, val: u8) { self.poke(addr.into(), val) }
+    fn peek24_u32(&mut self, addr: u32) -> u32 { self.peek24(addr.into()) }
+    fn poke24_u32(&mut self, addr: u32, val: u32) { self.poke24(addr.into(), val) }
 }
 
 impl PeekPoke for Memory {
-    fn peek<A: Into<Word>>(&self, addr: A) -> u8 { self[addr.into()] }
-    fn poke<A: Into<Word>>(&mut self, addr: A, val: u8) { self[addr.into()] = val; }
+    fn peek(&self, addr: Word) -> u8 { self[addr.into()] }
+    fn poke(&mut self, addr: Word, val: u8) { self[addr.into()] = val; }
 }
 
 #[cfg(test)]
@@ -69,21 +72,21 @@ mod tests {
     #[test]
     fn test_mem_peek_poke() {
         let mut mem = Memory::default();
-        assert_eq!(mem.peek(35), 0);
-        mem.poke(35, 45);
-        assert_eq!(mem.peek(35), 45);
-        assert_eq!(mem.peek(36), 0);
+        assert_eq!(mem.peek_u32(35), 0);
+        mem.poke_u32(35, 45);
+        assert_eq!(mem.peek_u32(35), 45);
+        assert_eq!(mem.peek_u32(36), 0);
     }
 
     #[test]
     fn test_mem_word_fns() {
         let mut mem = Memory::default();
-        mem.poke24(10, 0x123456);
-        assert_eq!(mem.peek(10), 0x56);
-        assert_eq!(mem.peek(11), 0x34);
-        assert_eq!(mem.peek(12), 0x12);
-        assert_eq!(mem.peek24(10), 0x123456);
-        assert_eq!(mem.peek24(11), 0x001234);
+        mem.poke24(10.into(), 0x123456);
+        assert_eq!(mem.peek_u32(10), 0x56);
+        assert_eq!(mem.peek_u32(11), 0x34);
+        assert_eq!(mem.peek_u32(12), 0x12);
+        assert_eq!(mem.peek24(10.into()), 0x123456);
+        assert_eq!(mem.peek24(11.into()), 0x001234);
     }
 
     #[test]

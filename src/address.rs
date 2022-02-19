@@ -24,6 +24,11 @@ impl std::ops::Sub<i32> for Word {
     fn sub(self, rhs: i32) -> Self::Output { self + -rhs }
 }
 
+impl std::ops::Sub<Word> for Word {
+    type Output = Word;
+    fn sub(self, rhs: Word) -> Self::Output { Word(self.0 - rhs.0) }
+}
+
 impl std::ops::SubAssign<i32> for Word {
     fn sub_assign(&mut self, rhs: i32) { *self = *self - rhs; }
 }

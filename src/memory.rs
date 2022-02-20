@@ -1,6 +1,6 @@
 use rand::Rng;
-use crate::address::Word;
-use crate::address::MEM_SIZE;
+use crate::word::Word;
+use crate::word::MEM_SIZE;
 
 pub struct Memory([u8; MEM_SIZE as usize]);
 

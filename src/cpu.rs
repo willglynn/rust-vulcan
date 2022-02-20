@@ -1,12 +1,12 @@
 use crate::opcodes::Opcode;
 use crate::opcodes::InvalidOpcode;
 use crate::memory::Memory;
-use crate::address::Word;
+use crate::word::Word;
 use crate::memory::PeekPoke;
 use std::convert::TryFrom;
 
 #[allow(clippy::upper_case_acronyms)]
-struct CPU {
+pub struct CPU {
     memory: Memory, // Main memory, all of it
     pc: Word, // program counter, address of the low byte of the instruction
     dp: Word, // data pointer, address of the low byte of one cell above the data stack
@@ -23,8 +23,13 @@ struct Instruction {
     length: u8
 }
 
+impl PeekPoke for CPU {
+    fn peek(&self, addr: Word) -> u8 { self.memory.peek(addr) }
+    fn poke(&mut self, addr: Word, val: u8) { self.memory.poke(addr, val) }
+}
+
 impl CPU {
-    fn new(memory: Memory) -> Self {
+    pub fn new(memory: Memory) -> Self {
         Self {
             memory,
             pc: 1024.into(),

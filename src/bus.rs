@@ -1,5 +1,5 @@
 use crate::memory::PeekPoke;
-use crate::address::Word;
+use crate::word::Word;
 
 pub trait Device {
     fn tick(&mut self);

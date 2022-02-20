@@ -11,12 +11,9 @@ use winit::{
     dpi::LogicalSize
 };
 
-use pixels::{Error, Pixels, SurfaceTexture};
+use pixels::{Pixels, SurfaceTexture};
 use rand::RngCore;
-use rand::prelude::ThreadRng;
-use std::time::{Instant, Duration};
-use pixels::wgpu::Instance;
-use std::convert::TryInto;
+use std::time::Instant;
 
 fn main() {
     let event_loop = EventLoop::new();
@@ -50,7 +47,7 @@ fn main() {
                 let start = Instant::now();
                 draw(pixels.get_frame());
                 let draw_time = Instant::now() - start;
-                pixels.render();
+                pixels.render().expect("Problem displaying framebuffer");
                 let total_time = Instant::now() - start;
                 println!("Tick took {} total, {} to draw", total_time.as_micros(), draw_time.as_micros());
             }
@@ -63,7 +60,7 @@ fn draw(frame: &mut [u8]) {
     assert_eq!(frame.len(), 640 * 480 * 4);
     let mut rng = rand::thread_rng();
 
-    for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {
+    for (_, pixel) in frame.chunks_exact_mut(4).enumerate() {
         let p = rng.next_u32();
         let [low, mid, high, _] = p.to_le_bytes();
         pixel[0] = low;

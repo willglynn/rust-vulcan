@@ -8,8 +8,8 @@ impl From<u32> for Word {
     fn from(a: u32) -> Self { Self(a & 0xffffff) }
 }
 
-impl Into<u32> for Word {
-    fn into(self) -> u32 { self.0 }
+impl From<Word> for u32 {
+    fn from(word: Word) -> Self { word.0 }
 }
 
 impl std::ops::Add<i32> for Word {

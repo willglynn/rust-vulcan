@@ -61,8 +61,8 @@ pub trait PeekPoke {
 }
 
 impl PeekPoke for Memory {
-    fn peek(&self, addr: Word) -> u8 { self[addr.into()] }
-    fn poke(&mut self, addr: Word, val: u8) { self[addr.into()] = val; }
+    fn peek(&self, addr: Word) -> u8 { self[addr] }
+    fn poke(&mut self, addr: Word, val: u8) { self[addr] = val; }
 }
 
 #[cfg(test)]

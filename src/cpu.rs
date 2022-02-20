@@ -5,6 +5,7 @@ use crate::address::Word;
 use crate::memory::PeekPoke;
 use std::convert::TryFrom;
 
+#[allow(clippy::upper_case_acronyms)]
 struct CPU {
     memory: Memory, // Main memory, all of it
     pc: Word, // program counter, address of the low byte of the instruction
@@ -80,7 +81,7 @@ impl CPU {
                 let arg_length = instruction & 3;
                 if arg_length == 0 {
                     Ok(Instruction {
-                        opcode: opcode,
+                        opcode,
                         arg: None,
                         length: 1
                     })
@@ -88,11 +89,11 @@ impl CPU {
                     let mut arg = 0u32;
                     for n in 0..arg_length {
                         let mut b: u32 = self.memory.peek(self.pc + (n + 1) as i32) as u32;
-                        b = b << (8 * n);
+                        b <<= 8 * n;
                         arg += b;
                     }
                     Ok(Instruction {
-                        opcode: opcode,
+                        opcode,
                         arg: Some(arg),
                         length: arg_length + 1
                     })

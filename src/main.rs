@@ -3,6 +3,7 @@ mod word;
 mod opcodes;
 mod cpu;
 mod bus;
+mod display;
 
 use winit::{
     event::{ Event, WindowEvent },
@@ -40,7 +41,12 @@ fn main() {
     let mut rng = rand::thread_rng();
 
     let memory = Memory::from(rng);
-    let cpu = CPU::new(memory);
+    let mut cpu = CPU::new(memory);
+    display::reset(&mut cpu);
+    for n in 0..256 {
+        let color = ((n / 32) << 3) as u8;
+        cpu.poke(Word::from(0x20000 - 0x100 + n as u32), color);
+    }
     window_loop(event_loop, window, pixels, cpu)
 }
 
@@ -71,16 +77,5 @@ fn window_loop(event_loop: EventLoop<()>, window: Window, mut pixels: Pixels, mu
 fn draw(frame: &mut [u8], cpu: &mut CPU) {
     assert_eq!(frame.len(), 640 * 480 * 4);
 
-    // For now, assume 160x120 direct graphics mode
-    for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {
-        let (display_row, display_col) = (i / 640, i % 640);
-        let (vulcan_row, vulcan_col) = (display_row >> 2, display_col >> 2);
-        let vb = cpu.peek(Word::from((0x10000 + vulcan_row * 160 + vulcan_col) as u32));
-        let (red, green, blue) = (vb >> 5, (vb >> 3) & 7, (vb & 3) << 1);
-
-        pixel[0] = red << 5;
-        pixel[1] = green << 5;
-        pixel[2] = blue << 5;
-        pixel[3] = 0xff;
-    }
+    display::draw(cpu, frame);
 }

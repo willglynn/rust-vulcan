@@ -13,7 +13,6 @@ use winit::{
 };
 
 use pixels::{Pixels, SurfaceTexture};
-use rand::RngCore;
 use std::time::Instant;
 use winit::window::Window;
 use crate::cpu::CPU;
@@ -33,20 +32,20 @@ fn main() {
             .unwrap()
     };
 
-    let mut pixels = {
+    let pixels = {
         let surface_texture = SurfaceTexture::new(640, 480, &window);
         Pixels::new(640, 480, surface_texture).unwrap()
     };
 
-    let mut rng = rand::thread_rng();
+    let rng = rand::thread_rng();
 
     let memory = Memory::from(rng);
     let mut cpu = CPU::new(memory);
     display::reset(&mut cpu);
-    for n in 0..256 {
-        let color = ((n / 32) << 3) as u8;
-        cpu.poke(Word::from(0x20000 - 0x100 + n as u32), color);
-    }
+    // for n in 0..256 {
+    //     let color = ((n / 32) << 3) as u8;
+    //     cpu.poke(Word::from(0x20000 - 0x100 + n as u32), color);
+    // }
     window_loop(event_loop, window, pixels, cpu)
 }
 
@@ -67,7 +66,7 @@ fn window_loop(event_loop: EventLoop<()>, window: Window, mut pixels: Pixels, mu
                 let draw_time = Instant::now() - start;
                 pixels.render().expect("Problem displaying framebuffer");
                 let total_time = Instant::now() - start;
-                //println!("Tick took {} total, {} to draw", total_time.as_micros(), draw_time.as_micros());
+                println!("Tick took {} total, {} to draw", total_time.as_micros(), draw_time.as_micros());
             }
             _ => {}
         }

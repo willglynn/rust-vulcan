@@ -42,10 +42,17 @@ fn main() {
     let memory = Memory::from(rng);
     let mut cpu = CPU::new(memory);
     display::reset(&mut cpu);
-    // for n in 0..256 {
-    //     let color = ((n / 32) << 3) as u8;
-    //     cpu.poke(Word::from(0x20000 - 0x100 + n as u32), color);
-    // }
+    for n in 0..128 {
+        cpu.poke(Word::from(0x10000 + 128 * n), 0b11100000);
+        cpu.poke(Word::from(0x10000 + n), 0xff);
+        cpu.poke(Word::from(0x10000 + 128 * n + 127), 0b00000011);
+        cpu.poke(Word::from(0x10000 + 128 * 127 + n), 0b00011100);
+
+        cpu.poke(Word::from(0x10000 + 128 * n), 1);
+        cpu.poke(Word::from(0x10000 + n), 2);
+        cpu.poke(Word::from(0x10000 + 128 * n + 127), 3);
+        cpu.poke(Word::from(0x10000 + 128 * 127 + n), 4);
+    }
     window_loop(event_loop, window, pixels, cpu)
 }
 

@@ -16,7 +16,7 @@ struct DisplayRegisters {
 impl Default for DisplayRegisters {
     fn default() -> Self {
         Self {
-            mode: 6,
+            mode: 4,
             screen: 0x10000,
             palette: 0x20000 - 0x100,
             font: 0x20000 - 0x100 - 0x2000,
@@ -71,6 +71,8 @@ pub fn draw<P: PeekPoke>(machine: &P, frame: &mut[u8]) {
         (false, true, true) => draw_direct_high_gfx(machine, reg, frame),
         (true, true, false) => draw_paletted_high_text(machine, reg, frame),
         (false, true, false) => draw_direct_high_text(machine, reg, frame),
+        (false, false, false) => draw_direct_low_text(machine, reg, frame),
+        (true, false, false) => draw_paletted_low_text(machine, reg, frame),
         (_, _, _) => {panic!("Unimplemented mode {}", reg.mode)}
     }
 }
@@ -185,6 +187,67 @@ fn draw_direct_high_text<P: PeekPoke>(machine: &P, reg: DisplayRegisters, frame:
             pixel[0] = 0;
             pixel[1] = 0;
             pixel[2] = 0;
+        }
+        pixel[3] = 0xff;
+    }
+}
+
+fn draw_direct_low_text<P: PeekPoke>(machine: &P, reg: DisplayRegisters, frame: &mut [u8]) {
+    for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {
+        let (display_row, display_col) = (i / 640, i % 640);
+        let (vulcan_row, vulcan_col) = ((display_row >> 4) as u32, (display_col >> 4) as u32);
+
+        let addr = to_byte_address((vulcan_col, vulcan_row), reg);
+        let char_idx= machine.peek(Word::from(addr));
+        let (char_row, char_col) = ((display_row / 2) % 8, (display_col / 2) % 8);
+        let char_byte = machine.peek(Word::from(reg.font + ((char_idx as u32) << 3) + char_row as u32));
+
+        let color_addr = addr + (reg.width * reg.height);
+        let color = machine.peek(Word::from(color_addr));
+
+        let (red, green, blue) = (color >> 5, (color >> 3) & 7, (color & 3) << 1);
+
+        if char_byte & (1 << (7 - char_col)) != 0 {
+            pixel[0] = red << 5;
+            pixel[1] = green << 5;
+            pixel[2] = blue << 5;
+        } else {
+            pixel[0] = 0;
+            pixel[1] = 0;
+            pixel[2] = 0;
+        }
+        pixel[3] = 0xff;
+    }
+}
+
+fn draw_paletted_low_text<P: PeekPoke>(machine: &P, reg: DisplayRegisters, frame: &mut [u8]) {
+    for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {
+        let (display_row, display_col) = (i / 640, i % 640);
+        let (vulcan_row, vulcan_col) = ((display_row >> 4) as u32, (display_col >> 4) as u32);
+
+        let addr = to_byte_address((vulcan_col, vulcan_row), reg);
+        let char_idx= machine.peek(Word::from(addr));
+        let (char_row, char_col) = ((display_row >> 1) % 8, (display_col >> 1) % 8);
+        let char_byte = machine.peek(Word::from(reg.font + ((char_idx as u32) << 3) + char_row as u32));
+
+        let color_addr = addr + (reg.width * reg.height);
+        let color_byte = machine.peek(Word::from(color_addr));
+        let (fg_color_idx, bg_color_idx) = (color_byte & 0xf, color_byte >> 4);
+
+        let fg_color = machine.peek(Word::from(reg.palette + fg_color_idx as u32));
+        let bg_color = machine.peek(Word::from(reg.palette + bg_color_idx as u32));
+
+        let (fg_red, fg_green, fg_blue) = (fg_color >> 5, (fg_color >> 3) & 7, (fg_color & 3) << 1);
+        let (bg_red, bg_green, bg_blue) = (bg_color >> 5, (bg_color >> 3) & 7, (bg_color & 3) << 1);
+
+        if char_byte & (1 << (7 - char_col)) != 0 {
+            pixel[0] = fg_red << 5;
+            pixel[1] = fg_green << 5;
+            pixel[2] = fg_blue << 5;
+        } else {
+            pixel[0] = bg_red << 5;
+            pixel[1] = bg_green << 5;
+            pixel[2] = bg_blue << 5;
         }
         pixel[3] = 0xff;
     }

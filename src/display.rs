@@ -54,12 +54,7 @@ fn init_display_registers<P: PeekPoke>(machine: &mut P, start: Word) {
 }
 
 fn init_font<P: PeekPoke>(machine: &mut P) {
-    let bytes = include_bytes!("font.rom");
-    let font_addr = DisplayRegisters::default().font;
-
-    for (offset, byte) in bytes.into_iter().enumerate() {
-        machine.poke(Word::from(font_addr + offset as u32), *byte)
-    }
+    machine.poke_slice(DisplayRegisters::default().font, include_bytes!("font.rom"));
 }
 
 pub fn draw<P: PeekPoke>(machine: &P, frame: &mut [u8]) {
@@ -86,26 +81,26 @@ pub fn reset<P: PeekPoke>(machine: &mut P) {
 
 fn init_palette<P: PeekPoke>(machine: &mut P) {
     let palette_addr = read_display_registers(machine, Word::from(16)).palette;
-    let default_palette = [
-        0x00, 0x05, 0x65, 0x11, 0xa8, 0x49, 0xeb, 0xff, 0xe1, 0xf4, 0xfc, 0x1c, 0x37, 0x8e, 0xee,
-        0xfa,
-    ];
-    for (i, b) in default_palette.into_iter().enumerate() {
-        machine.poke(Word::from(palette_addr + i as u32), b);
-    }
+    machine.poke_slice(
+        palette_addr,
+        &[
+            0x00, 0x05, 0x65, 0x11, 0xa8, 0x49, 0xeb, 0xff, 0xe1, 0xf4, 0xfc, 0x1c, 0x37, 0x8e,
+            0xee, 0xfa,
+        ],
+    );
 }
 
-fn to_byte_address((x, y): (u32, u32), reg: DisplayRegisters) -> Word {
-    let row_start = (Word::from(y) + reg.row_offset % reg.height) * reg.width + reg.screen;
-    ((Word::from(x) + reg.col_offset) % reg.width) + row_start
+fn to_byte_address((x, y): (Word, Word), reg: DisplayRegisters) -> Word {
+    let row_start = (y + reg.row_offset % reg.height) * reg.width + reg.screen;
+    ((x + reg.col_offset) % reg.width) + row_start
 }
 
 fn draw_direct_high_gfx<P: PeekPoke>(machine: &P, reg: DisplayRegisters, frame: &mut [u8]) {
     for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {
         let (display_row, display_col) = (i / 640, i % 640);
-        let (vulcan_row, vulcan_col) = ((display_row >> 2) as u32, (display_col >> 2) as u32);
+        let (vulcan_row, vulcan_col) = (Word::from(display_row >> 2), Word::from(display_col >> 2));
 
-        let vb = machine.peek(Word::from(to_byte_address((vulcan_col, vulcan_row), reg)));
+        let vb = machine.peek(to_byte_address((vulcan_col, vulcan_row), reg));
         let (red, green, blue) = (vb >> 5, (vb >> 2) & 7, (vb & 3) << 1);
 
         pixel[0] = red << 5;
@@ -118,11 +113,11 @@ fn draw_direct_high_gfx<P: PeekPoke>(machine: &P, reg: DisplayRegisters, frame: 
 fn draw_paletted_high_gfx<P: PeekPoke>(machine: &P, reg: DisplayRegisters, frame: &mut [u8]) {
     for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {
         let (display_row, display_col) = (i / 640, i % 640);
-        let (vulcan_row, vulcan_col) = ((display_row >> 2) as u32, (display_col >> 2) as u32);
+        let (vulcan_row, vulcan_col) = (Word::from(display_row >> 2), Word::from(display_col >> 2));
 
         let addr = to_byte_address((vulcan_col, vulcan_row), reg);
-        let color_idx = machine.peek(Word::from(addr));
-        let color = machine.peek(Word::from(reg.palette + color_idx as u32));
+        let color_idx = machine.peek(addr);
+        let color = machine.peek(reg.palette + color_idx);
         let (red, green, blue) = (color >> 5, (color >> 2) & 7, (color & 3) << 1);
 
         pixel[0] = red << 5;
@@ -135,21 +130,19 @@ fn draw_paletted_high_gfx<P: PeekPoke>(machine: &P, reg: DisplayRegisters, frame
 fn draw_paletted_high_text<P: PeekPoke>(machine: &P, reg: DisplayRegisters, frame: &mut [u8]) {
     for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {
         let (display_row, display_col) = (i / 640, i % 640);
-        let (vulcan_row, vulcan_col) = ((display_row >> 3) as u32, (display_col >> 3) as u32);
+        let (vulcan_row, vulcan_col) = (Word::from(display_row >> 2), Word::from(display_col >> 2));
 
         let addr = to_byte_address((vulcan_col, vulcan_row), reg);
-        let char_idx = machine.peek(Word::from(addr));
+        let char_idx = machine.peek(addr) as u32;
         let (char_row, char_col) = (display_row % 8, display_col % 8);
-        let char_byte = machine.peek(Word::from(
-            reg.font + ((char_idx as u32) << 3) + char_row as u32,
-        ));
+        let char_byte = machine.peek(reg.font + (char_idx << 3) + char_row);
 
         let color_addr = addr + (reg.width * reg.height);
-        let color_byte = machine.peek(Word::from(color_addr));
+        let color_byte = machine.peek(color_addr);
         let (fg_color_idx, bg_color_idx) = (color_byte & 0xf, color_byte >> 4);
 
-        let fg_color = machine.peek(Word::from(reg.palette + fg_color_idx as u32));
-        let bg_color = machine.peek(Word::from(reg.palette + bg_color_idx as u32));
+        let fg_color = machine.peek(reg.palette + fg_color_idx);
+        let bg_color = machine.peek(reg.palette + bg_color_idx);
 
         let (fg_red, fg_green, fg_blue) = (fg_color >> 5, (fg_color >> 2) & 7, (fg_color & 3) << 1);
         let (bg_red, bg_green, bg_blue) = (bg_color >> 5, (bg_color >> 2) & 7, (bg_color & 3) << 1);
@@ -170,17 +163,15 @@ fn draw_paletted_high_text<P: PeekPoke>(machine: &P, reg: DisplayRegisters, fram
 fn draw_direct_high_text<P: PeekPoke>(machine: &P, reg: DisplayRegisters, frame: &mut [u8]) {
     for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {
         let (display_row, display_col) = (i / 640, i % 640);
-        let (vulcan_row, vulcan_col) = ((display_row >> 3) as u32, (display_col >> 3) as u32);
+        let (vulcan_row, vulcan_col) = (Word::from(display_row >> 2), Word::from(display_col >> 2));
 
         let addr = to_byte_address((vulcan_col, vulcan_row), reg);
-        let char_idx = machine.peek(Word::from(addr));
+        let char_idx = machine.peek(addr) as u32;
         let (char_row, char_col) = (display_row % 8, display_col % 8);
-        let char_byte = machine.peek(Word::from(
-            reg.font + ((char_idx as u32) << 3) + char_row as u32,
-        ));
+        let char_byte = machine.peek(reg.font + (char_idx << 3) + char_row);
 
         let color_addr = addr + (reg.width * reg.height);
-        let color = machine.peek(Word::from(color_addr));
+        let color = machine.peek(color_addr);
 
         let (red, green, blue) = (color >> 5, (color >> 2) & 7, (color & 3) << 1);
 
@@ -200,17 +191,15 @@ fn draw_direct_high_text<P: PeekPoke>(machine: &P, reg: DisplayRegisters, frame:
 fn draw_direct_low_text<P: PeekPoke>(machine: &P, reg: DisplayRegisters, frame: &mut [u8]) {
     for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {
         let (display_row, display_col) = (i / 640, i % 640);
-        let (vulcan_row, vulcan_col) = ((display_row >> 4) as u32, (display_col >> 4) as u32);
+        let (vulcan_row, vulcan_col) = (Word::from(display_row >> 2), Word::from(display_col >> 2));
 
         let addr = to_byte_address((vulcan_col, vulcan_row), reg);
-        let char_idx = machine.peek(Word::from(addr));
+        let char_idx = machine.peek(addr) as u32;
         let (char_row, char_col) = ((display_row / 2) % 8, (display_col / 2) % 8);
-        let char_byte = machine.peek(Word::from(
-            reg.font + ((char_idx as u32) << 3) + char_row as u32,
-        ));
+        let char_byte = machine.peek(reg.font + (char_idx << 3) + char_row);
 
         let color_addr = addr + (reg.width * reg.height);
-        let color = machine.peek(Word::from(color_addr));
+        let color = machine.peek(color_addr);
 
         let (red, green, blue) = (color >> 5, (color >> 2) & 7, (color & 3) << 1);
 
@@ -230,21 +219,19 @@ fn draw_direct_low_text<P: PeekPoke>(machine: &P, reg: DisplayRegisters, frame: 
 fn draw_paletted_low_text<P: PeekPoke>(machine: &P, reg: DisplayRegisters, frame: &mut [u8]) {
     for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {
         let (display_row, display_col) = (i / 640, i % 640);
-        let (vulcan_row, vulcan_col) = ((display_row >> 4) as u32, (display_col >> 4) as u32);
+        let (vulcan_row, vulcan_col) = (Word::from(display_row >> 2), Word::from(display_col >> 2));
 
         let addr = to_byte_address((vulcan_col, vulcan_row), reg);
-        let char_idx = machine.peek(Word::from(addr));
+        let char_idx = machine.peek(addr) as u32;
         let (char_row, char_col) = ((display_row >> 1) % 8, (display_col >> 1) % 8);
-        let char_byte = machine.peek(Word::from(
-            reg.font + ((char_idx as u32) << 3) + char_row as u32,
-        ));
+        let char_byte = machine.peek(reg.font + (char_idx << 3) + char_row);
 
         let color_addr = addr + (reg.width * reg.height);
         let color_byte = machine.peek(Word::from(color_addr));
         let (fg_color_idx, bg_color_idx) = (color_byte & 0xf, color_byte >> 4);
 
-        let fg_color = machine.peek(Word::from(reg.palette + fg_color_idx as u32));
-        let bg_color = machine.peek(Word::from(reg.palette + bg_color_idx as u32));
+        let fg_color = machine.peek(reg.palette + fg_color_idx);
+        let bg_color = machine.peek(reg.palette + bg_color_idx);
 
         let (fg_red, fg_green, fg_blue) = (fg_color >> 5, (fg_color >> 2) & 7, (fg_color & 3) << 1);
         let (bg_red, bg_green, bg_blue) = (bg_color >> 5, (bg_color >> 2) & 7, (bg_color & 3) << 1);
@@ -272,11 +259,11 @@ fn draw_direct_low_gfx<P: PeekPoke>(machine: &P, reg: DisplayRegisters, frame: &
             && display_col < (320 + 64 * 3)
         {
             let (vulcan_row, vulcan_col) = (
-                ((display_row - (240 - 64 * 3)) / 3) as u32,
-                ((display_col - (320 - 64 * 3)) / 3) as u32,
+                Word::from((display_row - (240 - 64 * 3)) / 3),
+                Word::from((display_col - (320 - 64 * 3)) / 3),
             );
 
-            let vb = machine.peek(Word::from(to_byte_address((vulcan_col, vulcan_row), reg)));
+            let vb = machine.peek(to_byte_address((vulcan_col, vulcan_row), reg));
             let (red, green, blue) = (vb >> 5, (vb >> 2) & 7, (vb & 3) << 1);
 
             pixel[0] = red << 5;
@@ -302,13 +289,12 @@ fn draw_paletted_low_gfx<P: PeekPoke>(machine: &P, reg: DisplayRegisters, frame:
             && display_col < (320 + 64 * 3)
         {
             let (vulcan_row, vulcan_col) = (
-                ((display_row - (240 - 64 * 3)) / 3) as u32,
-                ((display_col - (320 - 64 * 3)) / 3) as u32,
+                Word::from((display_row - (240 - 64 * 3)) / 3),
+                Word::from((display_col - (320 - 64 * 3)) / 3),
             );
 
-            let color_idx =
-                machine.peek(Word::from(to_byte_address((vulcan_col, vulcan_row), reg)));
-            let vb = machine.peek(Word::from(reg.palette + color_idx as u32));
+            let color_idx = machine.peek(to_byte_address((vulcan_col, vulcan_row), reg));
+            let vb = machine.peek(reg.palette + color_idx);
             let (red, green, blue) = (vb >> 5, (vb >> 2) & 7, (vb & 3) << 1);
 
             pixel[0] = red << 5;

@@ -10,12 +10,17 @@ pub struct Bus<A, B> {
     start: Word,
     end: Word,
     device: A,
-    rest: B
+    rest: B,
 }
 
 impl<A, B> Bus<A, B> {
     fn new(start: u32, end: u32, device: A, rest: B) -> Self {
-        Self { start: start.into(), end: end.into(), device, rest }
+        Self {
+            start: start.into(),
+            end: end.into(),
+            device,
+            rest,
+        }
     }
 
     fn at(addr: u32, device: A, rest: B) -> Self {
@@ -56,17 +61,26 @@ impl<A: Device, B: Device> Device for Bus<A, B> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::memory::PeekPokeExt;
 
     struct TestDevice(i32);
     impl Device for TestDevice {
-        fn tick(&mut self) { self.0 += 1 }
-        fn reset(&mut self) { self.0 = 10 }
+        fn tick(&mut self) {
+            self.0 += 1
+        }
+        fn reset(&mut self) {
+            self.0 = 10
+        }
     }
 
     struct ArrayDevice([u8; 10]);
     impl PeekPoke for ArrayDevice {
-        fn peek(&self, addr: Word) -> u8 { self.0[usize::from(addr)] }
-        fn poke(&mut self, addr: Word, val: u8) { self.0[usize::from(addr)] = val }
+        fn peek(&self, addr: Word) -> u8 {
+            self.0[usize::from(addr)]
+        }
+        fn poke(&mut self, addr: Word, val: u8) {
+            self.0[usize::from(addr)] = val
+        }
     }
 
     #[test]
@@ -76,7 +90,9 @@ mod tests {
         let device3 = TestDevice(7);
         let mut bus = Bus::at(5, device1, Bus::at(6, device2, device3));
 
-        for _ in 0..5 { bus.tick() }
+        for _ in 0..5 {
+            bus.tick()
+        }
         assert_eq!(bus.device.0, 10);
         assert_eq!(bus.rest.device.0, 11);
         assert_eq!(bus.rest.rest.0, 12);
@@ -96,8 +112,8 @@ mod tests {
     #[test]
     fn test_poke_peek() {
         let mut bus = Bus::new(5, 10, ArrayDevice([0u8; 10]), ArrayDevice([0u8; 10]));
-        bus.poke_u32(2, 2); // Goes into the 2nd device
-        bus.poke_u32(6, 6); // Goes into the first device...
+        bus.poke8(2, 2); // Goes into the 2nd device
+        bus.poke8(6, 6); // Goes into the first device...
         assert_eq!(bus.device.0[1], 6); // At index 1
         assert_eq!(bus.rest.0[2], 2); // Second device gets the other write
 
@@ -105,7 +121,7 @@ mod tests {
         assert_eq!(bus.device.0[2], 0);
         assert_eq!(bus.rest.0[1], 0);
 
-        assert_eq!(bus.peek_u32(2), 2); // Reading from the first device
-        assert_eq!(bus.peek_u32(6), 6); // And the second
+        assert_eq!(bus.peek8(2), 2); // Reading from the first device
+        assert_eq!(bus.peek8(6), 6); // And the second
     }
 }
